@@ -112,4 +112,4 @@ http://localhost:8051
 
 This dashboard is proprietary software developed exclusively for London South Bank University faculty members. Any unauthorized use, modification, distribution, or duplication is strictly prohibited.
 
-© 2023 London South Bank University. All rights reserved.
+© 2025 London South Bank University. All rights reserved.
