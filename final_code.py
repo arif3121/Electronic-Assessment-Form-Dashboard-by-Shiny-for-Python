@@ -1,4 +1,4 @@
-from shiny import App, render, ui, reactive
+from shiny import App, render, ui, reactive      
 import pandas as pd
 from datetime import datetime
 import tempfile
@@ -142,93 +142,63 @@ def get_student_details(student_id, filename="student_records.xlsx"):
 def update_student_record(student_id, marks, comment, filename="student_records.xlsx"):
     """Update marks and comment for a specific student with column mapping support"""
     try:
+        # Define column names (these were missing)
+        id_column = "Student_ID"
+        marks_column = "Marks"
+        comment_column = "Comments"
+        
+        # Use absolute path like we did for reading
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        excel_path = os.path.join(script_dir, filename)
+        print(f"Trying to update Excel at: {excel_path}")
+        
         # Read the existing Excel file
-        df = pd.read_excel(filename)
+        df = pd.read_excel(excel_path)
         print(f"Read Excel file with {len(df)} rows for updating")
         
-        # Print column names for debugging
-        print(f"Excel columns for updating: {df.columns.tolist()}")
+        # Clean column names
+        df.columns = [col.strip() for col in df.columns]
+        print(f"Available columns: {df.columns.tolist()}")
         
-        # Define possible column names for the mark and comment fields
-        marks_columns = ["Marks", "Mark", "Grade", "Score", "FinalGrade"]
-        comment_columns = ["Comment", "Comments", "Feedback", "AssessorComment"]
-        id_columns = ["Student_ID", "StudentID", "Student ID", "ID"]
+        # Check if required columns exist
+        if id_column not in df.columns:
+            print(f"Error: Required column '{id_column}' not found in Excel file")
+            return False, f"Required column '{id_column}' not found in Excel"
+            
+        # Create columns if they don't exist
+        if marks_column not in df.columns:
+            print(f"Creating new column '{marks_column}'")
+            df[marks_column] = ""
+            
+        if comment_column not in df.columns:
+            print(f"Creating new column '{comment_column}'")
+            df[comment_column] = ""
         
-        # Find the actual column names in the file
-        def find_column(possible_names):
-            for name in possible_names:
-                if name in df.columns:
-                    return name
-            # If no exact match, try case-insensitive search
-            df_cols_lower = [col.lower() for col in df.columns]
-            for name in possible_names:
-                if name.lower() in df_cols_lower:
-                    idx = df_cols_lower.index(name.lower())
-                    return df.columns[idx]
-            return None
+        # IMPORTANT FIX: Convert student_id to string for comparison
+        student_id_str = str(student_id).strip()
+        print(f"Looking for student ID: {student_id_str}")
         
-        # Find the column names to use
-        id_column = find_column(id_columns)
-        marks_column = find_column(marks_columns)
-        comment_column = find_column(comment_columns)
-        
-        # Check if required columns were found
-        if not id_column:
-            print("ERROR: Could not find Student ID column")
-            # Use first column as fallback
-            id_column = df.columns[0]
-            print(f"Using '{id_column}' as Student ID column")
-        
-        if not marks_column:
-            print("ERROR: Could not find Marks column")
-            # Check if we can add the column
-            if "Marks" not in df.columns:
-                df["Marks"] = ""
-                marks_column = "Marks"
-                print("Added 'Marks' column to DataFrame")
-            else:
-                marks_column = "Marks"
-        
-        if not comment_column:
-            print("ERROR: Could not find Comment column")
-            # Check if we can add the column
-            if "Comment" not in df.columns:
-                df["Comment"] = ""
-                comment_column = "Comment"
-                print("Added 'Comment' column to DataFrame")
-            else:
-                comment_column = "Comment"
-        
-        print(f"Using columns: ID='{id_column}', Marks='{marks_column}', Comment='{comment_column}'")
-        
-        # Check if student exists
-        if student_id not in df[id_column].values:
+        # Check if student exists - with string conversion
+        student_found = False
+        for idx, row in df.iterrows():
+            if str(row[id_column]).strip() == student_id_str:
+                student_found = True
+                break
+                
+        if not student_found:
             print(f"Student ID {student_id} not found in records")
             return False, "Student ID not found"
         
-        # Check if student already has marks
-        student_row = df[df[id_column] == student_id]
-        if marks_column in student_row.columns and pd.notna(student_row[marks_column].values[0]) and student_row[marks_column].values[0] != "":
-            print(f"Student already has marks: {student_row[marks_column].values[0]}")
-            # Return True with warning message for the application to display
-            return True, "Student already marked"
+        # Update with string comparison
+        print(f"Updating student {student_id_str} with marks={marks}")
+        df.loc[df[id_column].astype(str).str.strip() == student_id_str, marks_column] = marks
+        df.loc[df[id_column].astype(str).str.strip() == student_id_str, comment_column] = comment
         
-        # Update the marks and comment
-        print(f"Updating student {student_id} with marks={marks} and comment length={len(comment)}")
-        df.loc[df[id_column] == student_id, marks_column] = marks
-        df.loc[df[id_column] == student_id, comment_column] = comment
-        
-        # Save back to Excel
-        df.to_excel(filename, index=False)
-        print(f"Successfully saved updated data to {filename}")
+        # Save back to Excel with absolute path
+        df.to_excel(excel_path, index=False)
+        print(f"Successfully saved updated data to {excel_path}")
         
         return True, "Student record updated successfully"
-        
-    except Exception as e:
-        print(f"Error updating student record: {e}")
-        import traceback
-        traceback.print_exc()
-        return False, f"Error updating record: {str(e)}"
         
     except Exception as e:
         print(f"Error updating student record: {e}")
